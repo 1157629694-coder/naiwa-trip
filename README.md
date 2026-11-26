@@ -133,8 +133,9 @@ ssh -T -R 80:localhost:8787 serveo.net
 
 ## 背景音乐（BGM）
 
-- 右下角胶囊按钮就是开关：亮着（玫瑰色 + 三条跳动的横线）代表在放，暗着代表停；按 **M** 也能切。
-- 歌是李荣浩《耳朵》，**音频文件不放仓库**（版权），要自己提供：把 mp3 放到 `frog/assets/bgm.mp3`，或运行 `tools\设置BGM.ps1 -Path "你的文件.mp3"`。
-- 放好后重新打包发布：`python $env:TEMP\buildweb2.py` 会把 mp3 以 base64 内联进 `gh_web/index.html`，再上传覆盖 GitHub 上那份 `index.html` 即可。
-- 没有 mp3 时按钮显示「放歌」，点一下会提示「缺 bgm.mp3」，游戏本身不受影响。
-- 浏览器不允许自动播放有声内容，所以音乐在点「开始旅行」那一下才起播（已按这个规则接好）。
+- 首页右下角胶囊按钮＝开关：亮成玫瑰色、三条竖线跳动＝正在放；暗色虚线＝没在放或没有音频。
+- 曲目：李荣浩《耳朵》（m4a/AAC 44.1k 立体声，3.9MB）。
+- 打包版不是 data URI——5MB 以上的 `data:audio/*` 在 Chromium 里加载不可靠（实测线上点了不响）。改成 base64 存进 `window.BGM_B64`，运行时 `atob` → `Blob` → `URL.createObjectURL`，再交给 `<audio>`。
+- 自动播放：浏览器禁网页自动出声，所以音乐在点「开始旅行」那一下起播；若那一刻音频还没 ready，之后任意一次点击都会补起播（`pointerdown` 兜底）。按 **M** 也能切。
+- 状态记在 localStorage `naiwa:bgm`（关掉才写 off）。音量 0.55，起播 1.5s 淡入、暂停 0.45s 淡出。
+- 想换歌：把新音频放 `frog/assets/bgm.mp3`（优先）或 `bgm.m4a`，重跑 `python $env:TEMP\buildweb2.py`，再上传覆盖 GitHub 上的 `index.html`。
