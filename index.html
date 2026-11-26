@@ -1409,6 +1409,11 @@ window.CLOSING = {
       } catch (e) {}
     }
 
+    /* 任一次点击都兜底起播：解决"点开始时音频还没 ready、迟到的 play() 被浏览器拦掉" */
+    document.addEventListener("pointerdown", function () {
+      if (want && ready && audio.paused) { play(); }
+    }, true);
+
     function paint() {
       var playing = ready && !audio.paused;
       var lab = btn.querySelector(".bgm-lab");
