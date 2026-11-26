@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>奶蛙的旅拍 · 在世界尽头留一张照片</title>
 <style>
-﻿/* 奶蛙旅拍 · 样式
+/* 奶蛙旅拍 · 样式
    深色影院感 + 纸本手账：背景铺满、拍立得浮在右下、字压在左下
 */
 :root {
@@ -101,6 +101,55 @@ html, body {
   content: ""; width: 1px; height: 26px; margin-bottom: 4px;
   background: linear-gradient(180deg, transparent, rgba(242, 235, 219, .45));
 }
+
+/* ---------------- 背景音乐开关 ---------------- */
+.bgm {
+  position: fixed; z-index: 44; right: 26px; bottom: 112px;
+  display: flex; align-items: center; gap: 9px;
+  height: 44px; padding: 0 16px 0 13px;
+  border-radius: 22px; cursor: pointer;
+  font-family: var(--sans); font-size: 11px; letter-spacing: .18em;
+  color: rgba(242, 237, 225, .72);
+  background: rgba(20, 18, 16, .38);
+  border: 1px solid rgba(242, 237, 225, .2);
+  backdrop-filter: blur(9px) saturate(1.1);
+  -webkit-backdrop-filter: blur(9px) saturate(1.1);
+  box-shadow: 0 10px 26px -14px rgba(0, 0, 0, .8);
+  transition: color .3s, border-color .3s, background .3s, transform .2s;
+  animation: fadeUp .8s .6s both;
+}
+.bgm:hover { transform: translateY(-1px); color: #f7f2e6; border-color: rgba(242, 237, 225, .38); }
+.bgm:active { transform: translateY(0) scale(.97); }
+
+.bgm-ico { font-size: 15px; line-height: 1; transform: translateY(-.5px); }
+.bgm-lab { font-size: 10px; letter-spacing: .22em; opacity: .8; }
+
+.bgm-wave { display: flex; align-items: flex-end; gap: 2px; height: 13px; }
+.bgm-wave i {
+  width: 2px; height: 4px; border-radius: 1px;
+  background: currentColor; opacity: .5;
+  transition: height .3s, opacity .3s;
+}
+
+/* 开着：玫瑰色 + 跳动的电平条 */
+.bgm.on {
+  color: #f0d9d2;
+  border-color: rgba(181, 98, 92, .72);
+  background: rgba(62, 26, 24, .42);
+  box-shadow: 0 0 0 1px rgba(181, 98, 92, .18), 0 12px 30px -16px rgba(0, 0, 0, .9);
+}
+.bgm.on .bgm-ico { color: #e6b3a9; }
+.bgm.on .bgm-wave i { opacity: .95; animation: eq .9s ease-in-out infinite; }
+.bgm.on .bgm-wave i:nth-child(2) { animation-delay: .18s; }
+.bgm.on .bgm-wave i:nth-child(3) { animation-delay: .36s; }
+@keyframes eq {
+  0%, 100% { height: 4px; }
+  50% { height: 12px; }
+}
+
+/* 找不到音频文件时：虚线 + 淡提示 */
+.bgm.missing { border-style: dashed; color: rgba(242, 237, 225, .5); }
+.bgm.missing .bgm-wave { display: none; }
 
 /* ---------------- 顶栏 ---------------- */
 .topbar {
@@ -535,6 +584,11 @@ html, body {
   .tip { display: none; }
 
   .topbar { padding: 12px 14px; gap: 8px; }
+
+  /* 手机：音乐开关缩成圆钮，落在正文右上方 */
+  .bgm { right: 12px; bottom: 104px; height: 38px; padding: 0 12px; gap: 6px; border-radius: 19px; }
+  .bgm-lab { display: none; }
+  .bgm-ico { font-size: 14px; }
   .avatar { width: 28px; height: 28px; }
   .brandtxt b { font-size: 12.5px; letter-spacing: .06em; }
   .brandtxt span { display: none; }
@@ -714,6 +768,14 @@ html, body {
 <div id="app" class="app">
 
   <div class="mark" aria-label="李小涵制作"><b>李小涵</b><span>制作</span></div>
+
+  <!-- 背景音乐：李荣浩《耳朵》，音频文件放 assets/bgm.mp3 -->
+  <audio id="bgm" loop preload="auto" playsinline></audio>
+  <button class="bgm" id="bgmBtn" type="button" aria-pressed="false" title="背景音乐 · 李荣浩《耳朵》">
+    <span class="bgm-ico" aria-hidden="true">♪</span>
+    <span class="bgm-lab">BGM</span>
+    <span class="bgm-wave" aria-hidden="true"><i></i><i></i><i></i></span>
+  </button>
 
   <div class="bgwrap">
     <div class="bg a" id="bgA"></div>
@@ -1324,6 +1386,104 @@ window.CLOSING = {
     $("ip").innerHTML = (I.p || []).join("<br>");
   }
 
+  /* ---------- 背景音乐：李荣浩《耳朵》 ----------
+     音频文件放 assets/bgm.mp3（换歌就换这个文件，也可以放 bgm.m4a / bgm.ogg）。
+     浏览器禁止无交互自动播放，所以第一次点击（开始旅行或点开关）时才真正出声。 */
+  var BGM = (function () {
+    var audio = $("bgm"), btn = $("bgmBtn");
+    var KEY = "naiwa:bgm";
+    var want = true, ready = false, missing = false;
+    var srcs = ["assets/bgm.mp3", "assets/bgm.m4a", "assets/bgm.ogg"];
+    var si = 0, fadeTimer = null, VOL = 0.55;
+
+    try { want = localStorage.getItem(KEY) !== "off"; } catch (e) {}
+
+    function paint() {
+      var playing = ready && !audio.paused;
+      var lab = btn.querySelector(".bgm-lab");
+      btn.classList.toggle("on", playing);
+      btn.classList.toggle("missing", missing);
+      if (lab) { lab.textContent = missing ? "放歌" : "BGM"; }
+      btn.setAttribute("aria-pressed", playing ? "true" : "false");
+      btn.title = missing
+        ? "还没找到音频：把《耳朵》.mp3 放进 assets 目录、改名 bgm.mp3"
+        : (playing ? "暂停背景音乐 · 李荣浩《耳朵》" : "播放背景音乐 · 李荣浩《耳朵》");
+    }
+
+    function fade(to, ms) {
+      window.clearInterval(fadeTimer);
+      var from = audio.volume, steps = Math.max(1, Math.round(ms / 60)), i = 0;
+      fadeTimer = window.setInterval(function () {
+        i++;
+        audio.volume = Math.min(1, Math.max(0, from + (to - from) * (i / steps)));
+        if (i >= steps) { window.clearInterval(fadeTimer); }
+      }, 60);
+    }
+
+    function play() {
+      if (!ready) return;
+      audio.volume = 0;
+      var p = audio.play();
+      if (p && p.catch) { p.catch(function () { paint(); }); }
+      fade(VOL, 1500);
+    }
+
+    function pause() {
+      fade(0, 450);
+      window.setTimeout(function () { if (!want) { audio.pause(); } }, 470);
+    }
+
+    function flash(msg) {
+      var h = el.hint, keep = h.textContent;
+      h.textContent = msg;
+      h.classList.add("show");
+      window.setTimeout(function () {
+        h.textContent = keep;
+        h.classList.remove("show");
+      }, 3000);
+    }
+
+    function toggle() {
+      if (missing) {
+        var lab = btn.querySelector(".bgm-lab");
+        if (lab) {
+          var keep = lab.textContent;
+          lab.textContent = "缺 bgm.mp3";
+          window.setTimeout(function () { lab.textContent = keep; }, 2600);
+        }
+        flash("把《耳朵》.mp3 放进 assets 目录、改名 bgm.mp3 就能播了");
+        return;
+      }
+      want = !want;
+      try { localStorage.setItem(KEY, want ? "on" : "off"); } catch (e) {}
+      if (want) { play(); } else { pause(); }
+      paint();
+    }
+
+    function loadNext() {
+      if (si >= srcs.length) { missing = true; paint(); return; }
+      audio.src = srcs[si++];
+      audio.load();
+    }
+
+    audio.addEventListener("loadedmetadata", function () {
+      ready = true; missing = false; paint();
+      if (want) { play(); }
+    });
+    audio.addEventListener("error", loadNext);
+    audio.addEventListener("play", paint);
+    audio.addEventListener("pause", paint);
+
+    btn.addEventListener("click", toggle);
+    if (audio.getAttribute("src")) { paint(); } else { loadNext(); }
+
+    return {
+      begin: function () { if (want) { play(); } },
+      toggle: toggle,
+      isOn: function () { return want; }
+    };
+  })();
+
   /* ---------- 事件 ---------- */
   el.btnNext.addEventListener("click", stamp);
   el.btnPrev.addEventListener("click", function () { go(S.i - 1); });
@@ -1334,6 +1494,7 @@ window.CLOSING = {
     el.intro.classList.add("gone");
     window.setTimeout(function () { el.intro.hidden = true; }, 900);
     go(0, true);
+    BGM.begin();
     window.setTimeout(function () { el.hint.classList.add("show"); }, 1600);
     window.setTimeout(function () { el.hint.classList.remove("show"); }, 7000);
   });
@@ -1356,6 +1517,7 @@ window.CLOSING = {
     if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); stamp(); }
     if (e.key === "ArrowLeft") { e.preventDefault(); go(S.i - 1); }
     if (e.key === "Escape") { el.journal.hidden = true; }
+    if (e.key === "m" || e.key === "M") { BGM.toggle(); }
   });
 
   /* ---------- 启动 ---------- */
